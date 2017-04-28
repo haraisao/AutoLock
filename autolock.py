@@ -163,14 +163,15 @@ class Lock:
     self.tone = 4
     self.state = None
 
+    self.motor = ServoMotor()
+    self.motor.setup(pin)
+
     wiringpi.pinMode(self.red, wiringpi.GPIO.OUTPUT)
     wiringpi.pinMode(self.green, wiringpi.GPIO.OUTPUT)
 
     wiringpi.pinMode(self.tone, wiringpi.GPIO.OUTPUT)
     wiringpi.softToneCreate(self.tone)
 
-    self.motor = ServoMotor()
-    self.motor.setup(pin)
     self.close()
 
     self.nfc = NfcReader()
