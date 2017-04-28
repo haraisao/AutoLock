@@ -156,12 +156,15 @@ class NfcReader:
 #
 # 
 class Lock:
-  def __init__(self, pin=18):
+  def __init__(self, pin=18, red_pin=24, green_pin=23, tone_pin=4):
     self.motor_pin = pin
-    self.red = 24
-    self.green = 23
-    self.tone = 4
+    self.red = red_pin
+    self.green = green_pin
+    self.tone = tone_pin
     self.state = None
+    self.pipo = [500,1000]
+    self.popi = [1000,500]
+    self.boo = [500,500]
 
     self.motor = ServoMotor()
     self.motor.setup(pin)
@@ -176,26 +179,35 @@ class Lock:
 
     self.nfc = NfcReader()
 
-  def open(self):
-    self.beep([500,1000])
-    self.motor.rotate(self.motor_pin, 150)
-    self.state = 'Opened'
+  def led_red(self):
+    wiringpi.digitalWrite(self.red, 1)
+    wiringpi.digitalWrite(self.green, 0)
+
+  def led_green(self):
     wiringpi.digitalWrite(self.red, 0)
     wiringpi.digitalWrite(self.green, 1)
 
-  def close(self):
-    self.beep([1000,500])
-    self.motor.rotate(self.motor_pin, 50)
-    self.state = 'Closed'
-    wiringpi.digitalWrite(self.red, 1)
+  def led_off(self):
+    wiringpi.digitalWrite(self.red, 0)
     wiringpi.digitalWrite(self.green, 0)
+
+  def open(self, pos=150):
+    self.beep(self.pipo)
+    self.motor.rotate(self.motor_pin, pos)
+    self.led_green()
+    self.state = 'Opened'
+
+  def close(self, pos=50):
+    self.beep(self.popi)
+    self.motor.rotate(self.motor_pin, pos)
+    self.led_red()
+    self.state = 'Closed'
 
   def beep(self, tones):
     for hz in tones:
       wiringpi.softToneWrite(self.tone, hz)
       time.sleep(0.1)
     wiringpi.softToneWrite(self.tone, 0)
-
 
   def register_card(self):
     self.nfc.call(self.nfc.register_card)
@@ -211,7 +223,7 @@ class Lock:
         self.close()
     else:
       print "You card is not registerd"
-      self.beep([500,500])
+      self.beep(self.boo)
 
 #
 #
