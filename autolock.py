@@ -164,7 +164,7 @@ class Lock:
     self.state = None
     self.pipo = [500,1000]
     self.popi = [1000,500]
-    self.boo = [500,500]
+    self.boo = [500,0,500,500]
 
     self.motor = ServoMotor()
     self.motor.setup(pin)
