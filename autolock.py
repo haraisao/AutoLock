@@ -183,10 +183,10 @@ class Lock:
     self.nfc = NfcReader()
 
   def load_config(self, fname="autolock.conf"):
-    self.config.read(fnme)
+    self.config.read(fname)
 
   def save_config(self, fname="autolock.conf"):
-    self.config.write(fnme)
+    self.config.write(fname)
 
   def set_value(self, sec, opt, val):
     try:
