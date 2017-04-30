@@ -3,6 +3,8 @@
 #
 import sys
 import time
+import ConfigParser
+
 import wiringpi
 
 import nfc
@@ -157,6 +159,7 @@ class NfcReader:
 # 
 class Lock:
   def __init__(self, pin=18, red_pin=24, green_pin=23, tone_pin=4):
+    self.config = ConfigParser.SafeConfigParser()
     self.motor_pin = pin
     self.red = red_pin
     self.green = green_pin
@@ -178,6 +181,28 @@ class Lock:
     self.close()
 
     self.nfc = NfcReader()
+
+  def load_config(self, fname="autolock.conf"):
+    self.config.read(fnme)
+
+  def save_config(self, fname="autolock.conf"):
+    self.config.write(fnme)
+
+  def set_value(self, sec, opt, val):
+    try:
+      self.config.set(sec, opt, val)
+      return True
+    except:
+      return None
+    
+  def get_value(self, sec, opt, val):
+    try:
+      if self.config.has_option(sec, opt) :
+        return self.config.get(sec, opt)
+      else:
+        return val
+    except:
+      return None
 
   def led_red(self):
     wiringpi.digitalWrite(self.red, 1)
