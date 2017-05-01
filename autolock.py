@@ -74,6 +74,7 @@ class NfcReader:
     try:
       self.clf = nfc.ContactlessFrontend(typ)
     except:
+      print "Fail to open device"
       self.clf = None
       
   def check_services(self, tag, start, n):
@@ -125,21 +126,38 @@ class NfcReader:
     for i in xrange(0, 0x10000, n):
         self.check_services(tag, i, n)
 
-  def call(self, func):
+  def call(self, func, timeout=0):
     if self.clf:
-      self.clf.connect(rdwr={'on-connect': func})
+      if timeout > 0:
+        tout = lambda: time.time() - self.started > timeout
+        self.started = time.time()
+        self.clf.connect(rdwr={'on-connect': func},terminate=tout)
+      else:
+        self.clf.connect(rdwr={'on-connect': func})
     else:
       print "ERROR: no NFC reader"
     
-  def read_syscode(self):
-    self.call(self.show_syscode)
+  def read_syscode(self, timeout=0):
+    self.call(self.show_syscode, timeout)
       
-  def dump_tag(self):
-    self.call(self.show_tag_info)
+  def dump_tag(self, timeout=0):
+    self.call(self.show_tag_info, timeout)
 
-  def info(self):
+  def count_time(self):
+     return( time.time() - self.started > self.timeout)
+
+  def set_timer(self, timeout):
+     self.started=time.time()
+     self.timeout=timeout
+     return [self.started, timeout]
+
+  def info(self, timeout=0):
     if self.clf:
-      self.clf.connect(rdwr={'on-connect': self.save_id})
+      if timeout > 0:
+        self.set_timer(timeout)
+        self.clf.connect(rdwr={'on-connect': self.save_id},terminate=self.count_time)
+      else:
+        self.clf.connect(rdwr={'on-connect': self.save_id})
 
   def save_id(self, tag):
     self.current_card_id=self.get_id(tag)
