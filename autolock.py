@@ -38,7 +38,6 @@ class ServoMotor:
 
   def initGpio(self):
     if self.readyGpio == False:
-#      wiringpi.wiringPiSetupGpio()
       safeSetupGpio()
       self.readyGpio = True
 
@@ -141,6 +140,43 @@ class Switch(threading.Thread):
     print "Push"
 
 #
+# Led
+#
+class Led:
+  def __init__(self, pin=23):
+    self.readyGpio = alreadyInit
+    self.state = 0
+    self.intval = 0.3
+    self.initGpio()
+    self.setPin(pin)
+
+  def initGpio(self):
+    if self.readyGpio == False:
+      safeSetupGpio()
+      self.readyGpio = True
+
+  def setPin(self, no):
+    self.pin = no
+    wiringpi.pinMode(self.pin, wiringpi.GPIO.OUTPUT)
+
+  def led_on(self):
+    wiringpi.digitalWrite(self.pin, 1)
+    self.state = 1
+    return self.state
+
+  def led_off(self):
+    wiringpi.digitalWrite(self.pin, 0)
+    self.state = 0
+    return self.state
+
+  def led_pattern(self, p, tm=0.3):
+    self.intval=tm 
+    for x in p:
+      wiringpi.digitalWrite(self.pin, x)
+      time.sleep(self.intval)
+    wiringpi.digitalWrite(self.pin, 0)
+
+#
 #  NFC
 #
 class ContactlessReader(nfc.ContactlessFrontend):
@@ -201,8 +237,6 @@ class NfcReader:
 
   def print_tag_info(self, tag):
     print tag.type
-    print tag._product
-    print hexlify(tag.pmm)
     print self.get_id(tag)
    
   def show_tag_info(self, tag):
@@ -234,6 +268,9 @@ class NfcReader:
   def dump_tag(self, timeout=0):
     self.call(self.show_tag_info, timeout)
 
+  def print_id(self, timeout=0):
+    self.call(self.print_tag_info, timeout)
+
   def info(self, timeout=0):
     if self.clf:
       return self.clf.wait_card(self.save_id, timeout)
@@ -262,9 +299,8 @@ class Lock(threading.Thread):
     threading.Thread.__init__(self)
     self.config = ConfigParser.SafeConfigParser()
     self.motor_pin = pin
-    self.red = red_pin
-    self.green = green_pin
     self.tone = tone_pin
+
     self.state = None
     self.pipo = [500,1000]
     self.popi = [1000,500]
@@ -273,11 +309,11 @@ class Lock(threading.Thread):
     self.motor = ServoMotor()
     self.motor.setup(pin)
 
-    wiringpi.pinMode(self.red, wiringpi.GPIO.OUTPUT)
-    wiringpi.pinMode(self.green, wiringpi.GPIO.OUTPUT)
-
     wiringpi.pinMode(self.tone, wiringpi.GPIO.OUTPUT)
     wiringpi.softToneCreate(self.tone)
+
+    self.red = Led(red_pin)
+    self.green = Led(green_pin)
 
     self.close()
 
@@ -309,16 +345,16 @@ class Lock(threading.Thread):
       return None
 
   def led_red(self):
-    wiringpi.digitalWrite(self.red, 1)
-    wiringpi.digitalWrite(self.green, 0)
+    self.red.led_on()
+    self.green.led_off()
 
   def led_green(self):
-    wiringpi.digitalWrite(self.red, 0)
-    wiringpi.digitalWrite(self.green, 1)
+    self.red.led_off()
+    self.green.led_on()
 
   def led_off(self):
-    wiringpi.digitalWrite(self.red, 0)
-    wiringpi.digitalWrite(self.green, 0)
+    self.red.led_off()
+    self.green.led_off()
 
   def open(self, pos=150):
     self.beep(self.pipo)
