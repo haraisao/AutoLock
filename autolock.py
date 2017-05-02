@@ -19,6 +19,12 @@ from binascii import hexlify
 #
 alreadyInit = False
 
+def safeSetupGpio():
+  if alreadyInit == False:
+    wiringpi.wiringPiSetupGpio()
+    alreadyInit = True
+
+
 class ServoMotor:
   def __init__(self):
     self.readyGpio = alreadyInit
@@ -28,7 +34,8 @@ class ServoMotor:
 
   def initGpio(self):
     if self.readyGpio == False:
-      wiringpi.wiringPiSetupGpio()
+#      wiringpi.wiringPiSetupGpio()
+      safeSetupGpio()
       self.readyGpio = True
 
   def setup(self,id):
@@ -73,9 +80,9 @@ class ContactlessReader(nfc.ContactlessFrontend):
     if timeout > 0:
       tout = lambda: time.time() - self.started > timeout
       self.started = time.time()
-      self.connect(rdwr={'on-connect': func},terminate=tout)
+      return self.connect(rdwr={'on-connect': func},terminate=tout)
     else:
-      self.connect(rdwr={'on-connect': func})
+      return self.connect(rdwr={'on-connect': func})
 
 class NfcReader:
   def __init__(self):
@@ -153,9 +160,10 @@ class NfcReader:
 
   def info(self, timeout=0):
     if self.clf:
-      self.clf.wait_card(self.save_id, timeout)
+      return self.clf.wait_card(self.save_id, timeout)
     else:
       print "ERROR: no NFC reader"
+    return False
 
   def save_id(self, tag):
     self.current_card_id=self.get_id(tag)
@@ -174,7 +182,7 @@ class NfcReader:
 #
 # 
 class Lock(threading.Thread):
-  def __init__(self, pin=18, red_pin=24, green_pin=23, tone_pin=4, ws_pin=17):
+  def __init__(self, pin=18, red_pin=24, green_pin=23, tone_pin=4, sw_pin=17):
     threading.Thread.__init__(self)
     self.config = ConfigParser.SafeConfigParser()
     self.motor_pin = pin
@@ -194,6 +202,7 @@ class Lock(threading.Thread):
     wiringpi.pinMode(self.green, wiringpi.GPIO.OUTPUT)
 
     wiringpi.pinMode(self.tone, wiringpi.GPIO.OUTPUT)
+    wiringpi.pinMode(self.sw, wiringpi.GPIO.INPUT)
     wiringpi.softToneCreate(self.tone)
 
     self.close()
@@ -259,17 +268,18 @@ class Lock(threading.Thread):
     self.nfc.call(self.nfc.register_card)
 
   def wait_card(self, tout=0):
-    self.nfc.info(tout)
-    if self.nfc.is_registered() :
-      if self.state == 'Closed':
-        print "Open !!"
-        self.open()
-      elif self.state == 'Opened':
-        print "Close !!"
-        self.close()
-    else:
-      print "You card is not registerd"
-      self.beep(self.boo)
+    res = self.nfc.info(tout)
+    if res :
+      if self.nfc.is_registered() :
+        if self.state == 'Closed':
+          print "Open !!"
+          self.open()
+        elif self.state == 'Opened':
+          print "Close !!"
+          self.close()
+      else:
+        print "You card is not registerd"
+        self.beep(self.boo)
 
   def start(self):
     self.mainloop = True
@@ -282,6 +292,10 @@ class Lock(threading.Thread):
   def run(self):
     while self.mainloop:
       self.wait_card(1)
+      if self.sw_state() == 1:
+        self.mainloop=0
+      else:
+        print self.sw_state()
     
     print "Terminated" 
 
