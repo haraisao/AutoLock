@@ -177,6 +177,46 @@ class Led:
     wiringpi.digitalWrite(self.pin, 0)
 
 #
+# Tone
+#
+class Tone:
+  def __init__(self, pin=4):
+    self.readyGpio = alreadyInit
+    self.state = 0
+    self._pipo = [500,1000]
+    self._popi = [1000,500]
+    self._boo = [500,0,500,500]
+
+    self.initGpio()
+    self.setPin(pin)
+
+  def initGpio(self):
+    if self.readyGpio == False:
+      safeSetupGpio()
+      self.readyGpio = True
+
+  def setPin(self, no):
+    self.pin = no
+    wiringpi.pinMode(self.pin, wiringpi.GPIO.OUTPUT)
+    wiringpi.softToneCreate(self.pin)
+
+  def beep(self, tones):
+    for hz in tones:
+      wiringpi.softToneWrite(self.pin, hz)
+      time.sleep(0.1)
+    wiringpi.softToneWrite(self.pin, 0)
+
+  def pipo(self):
+    self.beep(self._pipo)
+
+  def popi(self):
+    self.beep(self._popi)
+
+  def boo(self):
+    self.beep(self._boo)
+
+
+#
 #  NFC
 #
 class ContactlessReader(nfc.ContactlessFrontend):
@@ -299,21 +339,22 @@ class Lock(threading.Thread):
     threading.Thread.__init__(self)
     self.config = ConfigParser.SafeConfigParser()
     self.motor_pin = pin
-    self.tone = tone_pin
+#    self.tone = tone_pin
 
     self.state = None
-    self.pipo = [500,1000]
-    self.popi = [1000,500]
-    self.boo = [500,0,500,500]
+#    self.pipo = [500,1000]
+#    self.popi = [1000,500]
+#    self.boo = [500,0,500,500]
 
     self.motor = ServoMotor()
     self.motor.setup(pin)
 
-    wiringpi.pinMode(self.tone, wiringpi.GPIO.OUTPUT)
-    wiringpi.softToneCreate(self.tone)
+#    wiringpi.pinMode(self.tone, wiringpi.GPIO.OUTPUT)
+#    wiringpi.softToneCreate(self.tone)
 
     self.red = Led(red_pin)
     self.green = Led(green_pin)
+    self.tone = Tone(tone_pin)
 
     self.close()
 
@@ -357,22 +398,19 @@ class Lock(threading.Thread):
     self.green.led_off()
 
   def open(self, pos=150):
-    self.beep(self.pipo)
+    self.tone.pipo()
     self.motor.rotate(self.motor_pin, pos)
     self.led_green()
     self.state = 'Opened'
 
   def close(self, pos=50):
-    self.beep(self.popi)
+    self.tone.popi()
     self.motor.rotate(self.motor_pin, pos)
     self.led_red()
     self.state = 'Closed'
 
   def beep(self, tones):
-    for hz in tones:
-      wiringpi.softToneWrite(self.tone, hz)
-      time.sleep(0.1)
-    wiringpi.softToneWrite(self.tone, 0)
+    self.tone.beep(tones)
 
   def register_card(self):
     self.nfc.call(self.nfc.register_card)
@@ -389,7 +427,7 @@ class Lock(threading.Thread):
           self.close()
       else:
         print "You card is not registerd"
-        self.beep(self.boo)
+        self.tone.boo()
 
     return res
 
