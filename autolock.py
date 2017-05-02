@@ -3,6 +3,10 @@
 #
 import sys
 import time
+import os
+import errno
+import threading
+
 import ConfigParser
 
 import wiringpi
@@ -64,6 +68,15 @@ class ServoMotor:
 #
 #  NFC
 #
+class ContactlessReader(nfc.ContactlessFrontend):
+  def wait_card(self, func, timeout=0):
+    if timeout > 0:
+      tout = lambda: time.time() - self.started > timeout
+      self.started = time.time()
+      self.connect(rdwr={'on-connect': func},terminate=tout)
+    else:
+      self.connect(rdwr={'on-connect': func})
+
 class NfcReader:
   def __init__(self):
     self.open_device()
@@ -72,7 +85,7 @@ class NfcReader:
 
   def open_device(self, typ='usb'):
     try:
-      self.clf = nfc.ContactlessFrontend(typ)
+      self.clf = ContactlessReader(typ)
     except:
       print "Fail to open device"
       self.clf = None
@@ -128,12 +141,7 @@ class NfcReader:
 
   def call(self, func, timeout=0):
     if self.clf:
-      if timeout > 0:
-        tout = lambda: time.time() - self.started > timeout
-        self.started = time.time()
-        self.clf.connect(rdwr={'on-connect': func},terminate=tout)
-      else:
-        self.clf.connect(rdwr={'on-connect': func})
+      self.clf.wait_card(func, timeout)
     else:
       print "ERROR: no NFC reader"
     
@@ -143,21 +151,11 @@ class NfcReader:
   def dump_tag(self, timeout=0):
     self.call(self.show_tag_info, timeout)
 
-  def count_time(self):
-     return( time.time() - self.started > self.timeout)
-
-  def set_timer(self, timeout):
-     self.started=time.time()
-     self.timeout=timeout
-     return [self.started, timeout]
-
   def info(self, timeout=0):
     if self.clf:
-      if timeout > 0:
-        self.set_timer(timeout)
-        self.clf.connect(rdwr={'on-connect': self.save_id},terminate=self.count_time)
-      else:
-        self.clf.connect(rdwr={'on-connect': self.save_id})
+      self.clf.wait_card(self.save_id, timeout)
+    else:
+      print "ERROR: no NFC reader"
 
   def save_id(self, tag):
     self.current_card_id=self.get_id(tag)
@@ -175,13 +173,15 @@ class NfcReader:
 #
 #
 # 
-class Lock:
-  def __init__(self, pin=18, red_pin=24, green_pin=23, tone_pin=4):
+class Lock(threading.Thread):
+  def __init__(self, pin=18, red_pin=24, green_pin=23, tone_pin=4, ws_pin=17):
+    threading.Thread.__init__(self)
     self.config = ConfigParser.SafeConfigParser()
     self.motor_pin = pin
     self.red = red_pin
     self.green = green_pin
     self.tone = tone_pin
+    self.sw = sw_pin
     self.state = None
     self.pipo = [500,1000]
     self.popi = [1000,500]
@@ -226,6 +226,9 @@ class Lock:
     wiringpi.digitalWrite(self.red, 1)
     wiringpi.digitalWrite(self.green, 0)
 
+  def sw_state(self):
+    return wiringpi.digitalRead(self.sw)
+
   def led_green(self):
     wiringpi.digitalWrite(self.red, 0)
     wiringpi.digitalWrite(self.green, 1)
@@ -255,8 +258,8 @@ class Lock:
   def register_card(self):
     self.nfc.call(self.nfc.register_card)
 
-  def wait_card(self):
-    self.nfc.info()
+  def wait_card(self, tout=0):
+    self.nfc.info(tout)
     if self.nfc.is_registered() :
       if self.state == 'Closed':
         print "Open !!"
@@ -267,6 +270,20 @@ class Lock:
     else:
       print "You card is not registerd"
       self.beep(self.boo)
+
+  def start(self):
+    self.mainloop = True
+    threading.Thread.start(self)
+
+  def stop(self):
+    self.led_off()
+    self.mainloop = False
+
+  def run(self):
+    while self.mainloop:
+      self.wait_card(1)
+    
+    print "Terminated" 
 
 #
 #
