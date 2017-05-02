@@ -115,8 +115,9 @@ class Switch(threading.Thread):
   def set_callback_long(self, func):
     self.__callback_l=func
 
-  def start(self, func=None):
-    self.__callback=func
+  def start(self, func=None, func_l=None):
+    if func : self.__callback=func
+    if func_l : self.__callback_l=func_l
     self.mainloop = True
     threading.Thread.start(self)
 
@@ -264,7 +265,6 @@ class Lock(threading.Thread):
     self.red = red_pin
     self.green = green_pin
     self.tone = tone_pin
-    self.sw = sw_pin
     self.state = None
     self.pipo = [500,1000]
     self.popi = [1000,500]
@@ -277,18 +277,17 @@ class Lock(threading.Thread):
     wiringpi.pinMode(self.green, wiringpi.GPIO.OUTPUT)
 
     wiringpi.pinMode(self.tone, wiringpi.GPIO.OUTPUT)
-    wiringpi.pinMode(self.sw, wiringpi.GPIO.INPUT)
     wiringpi.softToneCreate(self.tone)
 
     self.close()
 
+    self.sw = Switch(sw_pin)
     self.nfc = NfcReader()
 
   def load_config(self, fname="autolock.conf"):
     self.config.read(fname)
     cards = self.get_value('nfc', 'cards', '')
     self.nfc.set_registered_cards(cards)
-    
 
   def save_config(self, fname="autolock.conf"):
     self.config.write(fname)
@@ -312,9 +311,6 @@ class Lock(threading.Thread):
   def led_red(self):
     wiringpi.digitalWrite(self.red, 1)
     wiringpi.digitalWrite(self.green, 0)
-
-  def sw_state(self):
-    return wiringpi.digitalRead(self.sw)
 
   def led_green(self):
     wiringpi.digitalWrite(self.red, 0)
@@ -359,18 +355,23 @@ class Lock(threading.Thread):
         print "You card is not registerd"
         self.beep(self.boo)
 
+    return res
+
+  def sw_push(self):
+    print "Push switch"
+
   def start(self):
+    self.sw.start(self.sw_push, self.stop)
     self.mainloop = True
     threading.Thread.start(self)
 
   def stop(self):
     self.mainloop = False
+    self.sw.stop()
 
   def run(self):
     while self.mainloop:
       self.wait_card(1)
-      if self.sw_state() == 1:
-        self.mainloop=0
     
     self.led_off()
     print "Terminated" 
