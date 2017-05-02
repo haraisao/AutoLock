@@ -35,6 +35,7 @@ class ServoMotor:
     self.PWM_PIN=[18, 13]
     self.pwm_range = 1920
     self.pwm_clock = 200
+    self.pin=0
 
   def initGpio(self):
     if self.readyGpio == False:
@@ -43,6 +44,8 @@ class ServoMotor:
 
   def setup(self,id):
     self.initGpio()
+    self.pin=id
+
     if id in self.PWM_PIN:
       self.setupPwm(id)
     else:
@@ -53,27 +56,29 @@ class ServoMotor:
     wiringpi.pwmSetMode(wiringpi.GPIO.PWM_MODE_MS)
     wiringpi.pwmSetRange(self.pwm_range)
     wiringpi.pwmSetClock(self.pwm_clock)
+    self.pin=id
 
   def setupSoftPwm(self,id):
     wiringpi.pinMode(id, wiringpi.GPIO.PWM_OUTPUT)
     wiringpi.softPwmCreate(id, 0, self.pwm_clock/2)
+    self.pin=id
 
-  def pwmWrite(self, id, angle):
-    if id in self.PWM_PIN:
-      wiringpi.pwmWrite(id, angle)
+  def pwmWrite(self, angle):
+    if self.pin in self.PWM_PIN:
+      wiringpi.pwmWrite(self.pin, angle)
     else:
-      wiringpi.softPwmWrite(id, angle/10)
+      wiringpi.softPwmWrite(self.pin, angle/10)
 
-  def rotate(self, id, angle):
-    self.pwmWrite(id, angle)
+  def rotate(self, angle):
+    self.pwmWrite(angle)
     if angle > 0:
       time.sleep(0.6)
-      self.pwmWrite(id, 0)
+      self.pwmWrite(0)
 
   def motor_main(id, angle):
     motor = ServoMotor()
     motor.setup(id)
-    motor.rotate(id, angle)
+    motor.rotate(angle)
 
 #
 #
@@ -338,19 +343,11 @@ class Lock(threading.Thread):
   def __init__(self, pin=18, red_pin=24, green_pin=23, tone_pin=4, sw_pin=17):
     threading.Thread.__init__(self)
     self.config = ConfigParser.SafeConfigParser()
-    self.motor_pin = pin
-#    self.tone = tone_pin
 
     self.state = None
-#    self.pipo = [500,1000]
-#    self.popi = [1000,500]
-#    self.boo = [500,0,500,500]
 
     self.motor = ServoMotor()
     self.motor.setup(pin)
-
-#    wiringpi.pinMode(self.tone, wiringpi.GPIO.OUTPUT)
-#    wiringpi.softToneCreate(self.tone)
 
     self.red = Led(red_pin)
     self.green = Led(green_pin)
@@ -399,13 +396,13 @@ class Lock(threading.Thread):
 
   def open(self, pos=150):
     self.tone.pipo()
-    self.motor.rotate(self.motor_pin, pos)
+    self.motor.rotate(pos)
     self.led_green()
     self.state = 'Opened'
 
   def close(self, pos=50):
     self.tone.popi()
-    self.motor.rotate(self.motor_pin, pos)
+    self.motor.rotate(pos)
     self.led_red()
     self.state = 'Closed'
 
