@@ -15,16 +15,20 @@ import nfc
 from binascii import hexlify
 
 #
-#  Servo Motor Control
+#  for GPIO
 #
 alreadyInit = False
 
 def safeSetupGpio():
+  global alreadyInit
+
   if alreadyInit == False:
     wiringpi.wiringPiSetupGpio()
     alreadyInit = True
 
-
+#
+#  Servo Motor Control
+#
 class ServoMotor:
   def __init__(self):
     self.readyGpio = alreadyInit
@@ -73,6 +77,69 @@ class ServoMotor:
     motor.rotate(id, angle)
 
 #
+#
+#
+class Switch(threading.Thread):
+  def __init__(self, pin=17):
+    threading.Thread.__init__(self)
+    self.lock = threading.Lock()
+    self.readyGpio = alreadyInit
+    self.state = [0,0]
+    self.long_state = [0,0,0,0,0]
+    self.intval = 0.1
+    self.__callback = None
+    self.__callback_l = self.stop
+    self.initGpio()
+    self.setPin(pin)
+
+  def initGpio(self):
+    if self.readyGpio == False:
+      safeSetupGpio()
+      self.readyGpio = True
+
+  def setPin(self, no):
+    self.pin = no
+    wiringpi.pinMode(self.pin, wiringpi.GPIO.INPUT)
+
+  def sw_state(self):
+    state = wiringpi.digitalRead(self.pin)
+    self.state.insert(0, state)
+    self.state.pop()
+    self.long_state.insert(0, state)
+    self.long_state.pop()
+    return state
+
+  def set_callback(self, func):
+    self.__callback=func
+
+  def set_callback_long(self, func):
+    self.__callback_l=func
+
+  def start(self, func=None):
+    self.__callback=func
+    self.mainloop = True
+    threading.Thread.start(self)
+
+  def stop(self):
+    self.mainloop = False
+
+  def run(self):
+    while self.mainloop:
+       self.sw_state()
+       if self.__callback_l and self.long_state == [1,1,1,1,1]:
+         self.__callback_l() 
+         self.long_state == [0,0,0,0,0]
+
+       elif self.__callback and self.state == [0,1]:
+         self.__callback() 
+
+       time.sleep(self.intval)
+    print "Terminate(Switch)"
+
+  def alert(self):
+    print "Push"
+
+#
 #  NFC
 #
 class ContactlessReader(nfc.ContactlessFrontend):
@@ -108,6 +175,14 @@ class NfcReader:
   def get_id(self, tag):
     return tag.identifier.encode("hex")
    
+  def set_registered_cards(self, cards):
+    if type(cards) == str:
+      self.registeredCards = cards.split(',')
+    elif type(cards) == list:
+      self.registeredCards = cards
+    else:
+      print "Invalid arguments in set_registered_cards"
+
   def register_card(self, tag):
     id = self.get_id(tag)
     if id in self.registeredCards :
@@ -211,6 +286,9 @@ class Lock(threading.Thread):
 
   def load_config(self, fname="autolock.conf"):
     self.config.read(fname)
+    cards = self.get_value('nfc', 'cards', '')
+    self.nfc.set_registered_cards(cards)
+    
 
   def save_config(self, fname="autolock.conf"):
     self.config.write(fname)
@@ -286,7 +364,6 @@ class Lock(threading.Thread):
     threading.Thread.start(self)
 
   def stop(self):
-    self.led_off()
     self.mainloop = False
 
   def run(self):
@@ -294,9 +371,8 @@ class Lock(threading.Thread):
       self.wait_card(1)
       if self.sw_state() == 1:
         self.mainloop=0
-      else:
-        print self.sw_state()
     
+    self.led_off()
     print "Terminated" 
 
 #
