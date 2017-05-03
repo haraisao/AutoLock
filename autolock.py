@@ -182,9 +182,9 @@ class Led:
     wiringpi.digitalWrite(self.pin, 0)
 
 #
-# Tone
+# Buzzer
 #
-class Tone:
+class Buzzer:
   def __init__(self, pin=4):
     self.readyGpio = alreadyInit
     self.state = 0
@@ -340,7 +340,7 @@ class NfcReader:
 #
 # 
 class Lock(threading.Thread):
-  def __init__(self, pin=18, red_pin=24, green_pin=23, tone_pin=4, sw_pin=17):
+  def __init__(self, pin=18, red_pin=24, green_pin=23, buzzer_pin=4, sw_pin=17):
     threading.Thread.__init__(self)
     self.config = ConfigParser.SafeConfigParser()
 
@@ -351,7 +351,7 @@ class Lock(threading.Thread):
 
     self.red = Led(red_pin)
     self.green = Led(green_pin)
-    self.tone = Tone(tone_pin)
+    self.buzzer = Buzzer(buzzer_pin)
 
     self.close()
 
@@ -395,19 +395,19 @@ class Lock(threading.Thread):
     self.green.led_off()
 
   def open(self, pos=150):
-    self.tone.pipo()
+    self.buzzer.pipo()
     self.motor.rotate(pos)
     self.led_green()
     self.state = 'Opened'
 
   def close(self, pos=50):
-    self.tone.popi()
+    self.buzzer.popi()
     self.motor.rotate(pos)
     self.led_red()
     self.state = 'Closed'
 
   def beep(self, tones):
-    self.tone.beep(tones)
+    self.buzzer.beep(tones)
 
   def register_card(self):
     self.nfc.call(self.nfc.register_card)
@@ -424,7 +424,7 @@ class Lock(threading.Thread):
           self.close()
       else:
         print "You card is not registerd"
-        self.tone.boo()
+        self.buzzer.boo()
 
     return res
 
