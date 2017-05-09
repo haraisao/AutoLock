@@ -36,6 +36,7 @@ class ServoMotor:
     self.pwm_range = 1920
     self.pwm_clock = 200
     self.pin=0
+    self.wait=1
 
   def initGpio(self):
     if self.readyGpio == False:
@@ -72,7 +73,7 @@ class ServoMotor:
   def rotate(self, angle):
     self.pwmWrite(angle)
     if angle > 0:
-      time.sleep(0.6)
+      time.sleep(self.wait)
       self.pwmWrite(0)
 
   def motor_main(id, angle):
@@ -101,9 +102,10 @@ class Switch(threading.Thread):
       safeSetupGpio()
       self.readyGpio = True
 
-  def setPin(self, no):
+  def setPin(self, no, pud=wiringpi.PUD_DOWN):
     self.pin = no
     wiringpi.pinMode(self.pin, wiringpi.GPIO.INPUT)
+    wiringpi.pullUpDnControl(self.pin, pud)
 
   def sw_state(self):
     state = wiringpi.digitalRead(self.pin)
